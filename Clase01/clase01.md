@@ -571,3 +571,766 @@ Esto es clave para entender por que WHERE va antes que HAVING. SQL ejecuta las p
 > - **HAVING** = "Quiero solo estos grupos" (despues de agrupar)
 
 Este conocimiento es la base para manipular datos con sentencias mas avanzadas y optimizar consultas, habilidades que se desarrollaran en las siguientes clases.
+
+---
+---
+
+# DDL y DML seguro: INSERT, UPDATE y DELETE
+
+## Introduccion
+
+¿Alguna vez te preguntaste que pasa si alguien ejecuta un `DELETE` sin querer y borra **todos** los datos de una tabla en produccion? Spoiler: pasa, y es un desastre.
+
+En esta seccion vamos a ver como usar las sentencias que **modifican datos** (INSERT, UPDATE, DELETE) de forma **segura**, para que nunca te pase eso. Tambien repasaremos DDL (las sentencias que crean y modifican la estructura de la base de datos) y aprenderemos buenas practicas que se usan en el mundo real.
+
+---
+
+## Repaso: ¿Que es DDL?
+
+**DDL** = **Data Definition Language** (Lenguaje de Definicion de Datos)
+
+Son las sentencias que definen la **estructura** de la base de datos: crear tablas, modificarlas o eliminarlas. No tocan los datos en si, sino el "esqueleto" donde se guardan.
+
+### Las 3 sentencias principales de DDL
+
+| Sentencia | ¿Que hace? | Analogia |
+|-----------|-----------|---------|
+| `CREATE` | Crea algo nuevo (tabla, base de datos, indice, etc.) | Construir una habitacion nueva en la casa |
+| `ALTER` | Modifica algo que ya existe | Agrandar una habitacion o agregarle una ventana |
+| `DROP` | Elimina algo **por completo** (estructura + datos) | Demoler la habitacion entera |
+
+### Ejemplos de DDL
+
+**Crear una tabla:**
+
+```sql
+CREATE TABLE Employees (
+    ID INT PRIMARY KEY,
+    Name VARCHAR(100),
+    HireDate DATE
+);
+```
+
+Esto crea una tabla con 3 columnas: un ID numerico (clave primaria), un nombre de hasta 100 caracteres y una fecha de contratacion.
+
+**Agregar una columna a una tabla existente:**
+
+```sql
+ALTER TABLE Employees ADD Email VARCHAR(255);
+```
+
+Esto le agrega una columna "Email" a la tabla que ya existia. No borra nada de lo que habia, solo agrega.
+
+**Eliminar una tabla completa:**
+
+```sql
+DROP TABLE Employees;
+```
+
+> **Cuidado:** `DROP` elimina la tabla Y todos sus datos. No hay vuelta atras (a menos que tengas un backup). Por eso es una operacion que se usa con mucha precaucion.
+
+### Consideraciones importantes sobre DDL
+
+1. **Impacto permanente:** Las operaciones DDL modifican la estructura de forma definitiva. Un `DROP TABLE` no se puede deshacer con `ROLLBACK` en la mayoria de los motores.
+2. **Permisos restringidos:** En entornos reales, solo los administradores de base de datos (DBA) tienen permisos para ejecutar DDL. No cualquiera deberia poder borrar tablas.
+3. **Probar antes en desarrollo:** Nunca ejecutes DDL directamente en produccion. Siempre proba primero en un entorno de desarrollo o testing.
+4. **Cada motor es diferente:** MySQL, PostgreSQL y SQL Server tienen pequenas variaciones en la sintaxis DDL. Siempre consulta la documentacion del motor que uses.
+
+---
+
+## Sentencias DML: INSERT, UPDATE y DELETE
+
+**DML** = **Data Manipulation Language** (Lenguaje de Manipulacion de Datos)
+
+Ahora si entramos a las sentencias que **tocan los datos**: agregar, modificar y borrar registros.
+
+### INSERT: Agregar datos nuevos
+
+`INSERT` mete filas nuevas en una tabla. Es como agregar una fila nueva en una planilla de Excel.
+
+**Sintaxis basica:**
+
+```sql
+INSERT INTO nombre_tabla (columna1, columna2, columna3)
+VALUES (valor1, valor2, valor3);
+```
+
+**Ejemplo:**
+
+```sql
+INSERT INTO Employees (ID, Name, HireDate)
+VALUES (1, 'Ana Garcia', '2024-03-15');
+```
+
+Esto agrega un nuevo empleado con ID 1, nombre "Ana Garcia" y fecha de contratacion 15 de marzo de 2024.
+
+**Insertar varias filas de una vez:**
+
+```sql
+INSERT INTO Employees (ID, Name, HireDate)
+VALUES
+    (2, 'Carlos Lopez', '2024-04-01'),
+    (3, 'Maria Fernandez', '2024-05-10'),
+    (4, 'Juan Perez', '2024-06-20');
+```
+
+> **Tip:** Siempre especifica las columnas en el INSERT (`INSERT INTO tabla (col1, col2)`). No uses `INSERT INTO tabla VALUES (...)` sin nombrar columnas, porque si alguien agrega una columna nueva a la tabla, tu INSERT se rompe.
+
+---
+
+### UPDATE: Modificar datos existentes
+
+`UPDATE` cambia valores que ya estan en la tabla. Es como editar una celda en Excel.
+
+**Sintaxis basica:**
+
+```sql
+UPDATE nombre_tabla
+SET columna = nuevo_valor
+WHERE condicion;
+```
+
+**Ejemplo:**
+
+```sql
+UPDATE Employees
+SET Name = 'Ana M. Garcia'
+WHERE ID = 1;
+```
+
+Esto cambia el nombre del empleado con ID 1 a "Ana M. Garcia".
+
+### ¡PELIGRO! UPDATE sin WHERE
+
+```sql
+-- NUNCA hagas esto en produccion:
+UPDATE Employees
+SET Name = 'Error';
+```
+
+**¿Que pasa?** Como no hay `WHERE`, SQL cambia el nombre de **TODOS** los empleados a "Error". Todos. Sin excepcion. Si tenes 100.000 empleados, los 100.000 ahora se llaman "Error".
+
+> **Regla de oro #1:** SIEMPRE usa `WHERE` en un `UPDATE`. Si no pones WHERE, afectas TODAS las filas.
+
+---
+
+### DELETE: Eliminar datos
+
+`DELETE` borra filas de una tabla. Es como borrar filas en Excel.
+
+**Sintaxis basica:**
+
+```sql
+DELETE FROM nombre_tabla
+WHERE condicion;
+```
+
+**Ejemplo:**
+
+```sql
+DELETE FROM Employees
+WHERE ID = 4;
+```
+
+Esto elimina al empleado con ID 4.
+
+### ¡PELIGRO! DELETE sin WHERE
+
+```sql
+-- NUNCA hagas esto en produccion:
+DELETE FROM Employees;
+```
+
+**¿Que pasa?** Borra **TODOS** los registros de la tabla. Todos. La tabla queda vacia (pero sigue existiendo, a diferencia de `DROP` que elimina la tabla entera).
+
+> **Regla de oro #2:** SIEMPRE usa `WHERE` en un `DELETE`. Si no pones WHERE, borras TODO.
+
+---
+
+## Buenas Practicas: Como usar UPDATE y DELETE de forma segura
+
+Estas son las practicas que usan los profesionales en el mundo real para no cometer errores:
+
+### 1. Siempre verifica con SELECT antes
+
+Antes de ejecutar un UPDATE o DELETE, hace un SELECT con el mismo WHERE para ver que filas vas a afectar:
+
+```sql
+-- Paso 1: Ver que vas a modificar
+SELECT * FROM Employees WHERE ID = 1;
+
+-- Paso 2: Si el resultado es correcto, ejecuta el cambio
+UPDATE Employees SET Name = 'Ana M. Garcia' WHERE ID = 1;
+```
+
+Es como mirar antes de cruzar la calle.
+
+### 2. Usa transacciones
+
+Las transacciones te permiten **deshacer cambios** si algo salio mal. Pensalo como un "Ctrl+Z" para la base de datos:
+
+```sql
+BEGIN TRANSACTION;
+
+UPDATE Employees SET Salary = 50000 WHERE ID = 1;
+
+-- Si todo esta bien:
+COMMIT;
+
+-- Si algo salio mal:
+-- ROLLBACK;
+```
+
+**¿Que paso aca?**
+- `BEGIN TRANSACTION` le dice a la base de datos: "voy a hacer cambios, pero no los confirmes todavia"
+- Ejecutas tu UPDATE
+- Si revisas y esta todo bien, haces `COMMIT` (confirmar)
+- Si algo esta mal, haces `ROLLBACK` (deshacer todo)
+
+### 3. Ejemplo completo de transferencia segura
+
+Imagina que queres transferir $100 de una cuenta a otra:
+
+```sql
+BEGIN TRANSACTION;
+
+-- Restar de la cuenta origen
+UPDATE cuentas SET saldo = saldo - 100 WHERE id_cuenta = 1;
+
+-- Sumar en la cuenta destino
+UPDATE cuentas SET saldo = saldo + 100 WHERE id_cuenta = 2;
+
+-- Si ambas operaciones salieron bien:
+COMMIT;
+```
+
+Si la base de datos se cae justo entre el primer UPDATE y el segundo, la transaccion se revierte automaticamente. Nadie pierde plata.
+
+### 4. Checklist de seguridad para DML
+
+| Practica | ¿Por que? |
+|----------|----------|
+| Verificar con `SELECT` antes | Para confirmar que vas a afectar las filas correctas |
+| Usar transacciones (`BEGIN`, `COMMIT`, `ROLLBACK`) | Para poder deshacer si algo sale mal |
+| Hacer backups antes de cambios grandes | Para tener una copia de seguridad por si todo falla |
+| Limitar permisos de usuario | Para que no cualquiera pueda modificar o borrar datos |
+| Registrar cambios (logs/auditoria) | Para saber quien cambio que y cuando |
+
+---
+
+## Diferencia entre DROP, DELETE y TRUNCATE
+
+Estas tres instrucciones "borran cosas", pero de formas muy diferentes:
+
+| Sentencia | ¿Que borra? | ¿Se puede deshacer? | ¿Que queda? |
+|-----------|------------|--------------------|----|
+| `DELETE FROM tabla WHERE ...` | Filas especificas | Si (con transaccion) | La tabla con las demas filas |
+| `DELETE FROM tabla` (sin WHERE) | Todas las filas | Si (con transaccion) | La tabla vacia (estructura intacta) |
+| `TRUNCATE TABLE tabla` | Todas las filas (mas rapido) | No en la mayoria de motores | La tabla vacia (estructura intacta) |
+| `DROP TABLE tabla` | La tabla completa | No | Nada. La tabla deja de existir |
+
+> **Analogia:**
+> - `DELETE` = Borrar filas de una planilla de Excel
+> - `TRUNCATE` = Seleccionar todo y apretar "Suprimir" (mas rapido, pero sin Ctrl+Z)
+> - `DROP` = Borrar el archivo de Excel completo del disco
+
+---
+
+## Seguridad y permisos (DCL)
+
+Recordemos que **DCL** (Data Control Language) es el sublenguaje que controla **quien puede hacer que** en la base de datos.
+
+Para proteger los datos, es fundamental que no todos los usuarios tengan permisos para modificar o borrar:
+
+```sql
+-- Dar permiso de solo lectura a un analista
+GRANT SELECT ON Employees TO UsuarioAnalista;
+
+-- Dar permiso de insercion (pero NO de borrado)
+GRANT INSERT ON Employees TO UsuarioAnalista;
+
+-- Quitar permiso de borrado a un usuario
+REVOKE DELETE ON Employees FROM UsuarioJunior;
+```
+
+> **Buena practica:** En produccion, la mayoria de los usuarios deberian tener solo permisos de `SELECT` (lectura). Solo usuarios especificos y autorizados deberian poder hacer INSERT, UPDATE o DELETE.
+
+---
+
+## Ejercicio practico
+
+### Instrucciones
+
+1. **Verificar antes de modificar:** Hace un `SELECT` para identificar las filas que queres cambiar en la tabla `Employees`.
+2. **UPDATE seguro:** Escribi un `UPDATE` que cambie el campo `DepartmentID` para un grupo especifico de empleados, usando un `WHERE` adecuado.
+3. **Validar:** Antes de ejecutar, verifica con `SELECT` que solo las filas correctas seran afectadas.
+4. **Usar transaccion:** Ejecuta el UPDATE dentro de un `BEGIN TRANSACTION` y confirma con `COMMIT`.
+5. **DELETE seguro:** Escribi un `DELETE` para eliminar registros antiguos, aplicando las mismas buenas practicas.
+6. **Revisar permisos:** Verifica que tu usuario tiene los privilegios necesarios.
+
+> **Recorda:** Siempre valida y proba tus sentencias en un entorno controlado antes de aplicarlas en produccion.
+
+### Script para crear la base de datos de practica
+
+```sql
+----------------------------------------------------
+-- 0. CREAR BASE (si no existe) Y USARLA
+----------------------------------------------------
+IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'PracticeJoinSubqueries')
+BEGIN
+    CREATE DATABASE PracticeJoinSubqueries;
+END
+GO
+USE PracticeJoinSubqueries;
+GO
+
+----------------------------------------------------
+-- 1. ELIMINAR FOREIGN KEYS SI EXISTEN
+----------------------------------------------------
+IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Employees_Departments')
+    ALTER TABLE dbo.Employees DROP CONSTRAINT FK_Employees_Departments;
+IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Projects_Employees')
+    ALTER TABLE dbo.Projects DROP CONSTRAINT FK_Projects_Employees;
+IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Evaluations_Employees')
+    ALTER TABLE dbo.Evaluations DROP CONSTRAINT FK_Evaluations_Employees;
+
+----------------------------------------------------
+-- 2. ELIMINAR INDICES SI EXISTEN
+----------------------------------------------------
+IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Employees_DepartmentID')
+    DROP INDEX IX_Employees_DepartmentID ON dbo.Employees;
+IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Projects_LeaderEmployeeID')
+    DROP INDEX IX_Projects_LeaderEmployeeID ON dbo.Projects;
+IF EXISTS (SELECT name FROM sys.indexes WHERE name = 'IX_Evaluations_EmployeeID')
+    DROP INDEX IX_Evaluations_EmployeeID ON dbo.Evaluations;
+
+----------------------------------------------------
+-- 3. ELIMINAR TABLAS SI EXISTEN
+----------------------------------------------------
+IF OBJECT_ID('dbo.Evaluations', 'U') IS NOT NULL DROP TABLE dbo.Evaluations;
+IF OBJECT_ID('dbo.Projects', 'U') IS NOT NULL DROP TABLE dbo.Projects;
+IF OBJECT_ID('dbo.Employees', 'U') IS NOT NULL DROP TABLE dbo.Employees;
+IF OBJECT_ID('dbo.Departments', 'U') IS NOT NULL DROP TABLE dbo.Departments;
+GO
+
+----------------------------------------------------
+-- 4. CREACION DE TABLAS
+----------------------------------------------------
+CREATE TABLE dbo.Departments (
+    DepartmentID INT IDENTITY(1,1) PRIMARY KEY,
+    DepartmentName NVARCHAR(100) NOT NULL,
+    Location NVARCHAR(100)
+);
+GO
+
+CREATE TABLE dbo.Employees (
+    EmployeeID INT IDENTITY(1,1) PRIMARY KEY,
+    FirstName NVARCHAR(50) NOT NULL,
+    LastName NVARCHAR(50) NOT NULL,
+    Email NVARCHAR(200) NOT NULL,
+    HireDate DATE NOT NULL,
+    Salary INT NOT NULL,
+    DepartmentID INT NULL
+);
+GO
+
+CREATE TABLE dbo.Projects (
+    ProjectID INT IDENTITY(1,1) PRIMARY KEY,
+    ProjectName NVARCHAR(150) NOT NULL,
+    StartDate DATE NULL,
+    EndDate DATE NULL,
+    LeaderEmployeeID INT NULL
+);
+GO
+
+CREATE TABLE dbo.Evaluations (
+    EvalID INT IDENTITY(1,1) PRIMARY KEY,
+    EmployeeID INT NOT NULL,
+    EvalDate DATE NOT NULL,
+    Score TINYINT NOT NULL CHECK (Score BETWEEN 1 AND 5),
+    Comments NVARCHAR(400)
+);
+GO
+
+----------------------------------------------------
+-- 5. FOREIGN KEYS
+----------------------------------------------------
+ALTER TABLE dbo.Employees
+ADD CONSTRAINT FK_Employees_Departments
+FOREIGN KEY (DepartmentID) REFERENCES dbo.Departments(DepartmentID);
+
+ALTER TABLE dbo.Projects
+ADD CONSTRAINT FK_Projects_Employees
+FOREIGN KEY (LeaderEmployeeID) REFERENCES dbo.Employees(EmployeeID);
+
+ALTER TABLE dbo.Evaluations
+ADD CONSTRAINT FK_Evaluations_Employees
+FOREIGN KEY (EmployeeID) REFERENCES dbo.Employees(EmployeeID);
+GO
+
+----------------------------------------------------
+-- 6. INDICES
+----------------------------------------------------
+CREATE INDEX IX_Employees_DepartmentID ON dbo.Employees(DepartmentID);
+CREATE INDEX IX_Projects_LeaderEmployeeID ON dbo.Projects(LeaderEmployeeID);
+CREATE INDEX IX_Evaluations_EmployeeID ON dbo.Evaluations(EmployeeID);
+GO
+
+----------------------------------------------------
+-- 7. INSERTAR DATOS
+----------------------------------------------------
+
+-- DEPARTAMENTOS
+INSERT INTO dbo.Departments (DepartmentName, Location)
+VALUES
+('Recursos Humanos','Buenos Aires'),
+('Desarrollo','CABA'),
+('Ventas','Rosario'),
+('Marketing','CABA'),
+('Soporte','Mendoza'),
+('Finanzas','Buenos Aires'),
+('Operaciones','Cordoba'),
+('Investigacion','La Plata');
+GO
+
+-- 100 EMPLEADOS
+;WITH tally AS (
+    SELECT TOP (100) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+    FROM sys.all_objects
+)
+INSERT INTO dbo.Employees (FirstName, LastName, Email, HireDate, Salary, DepartmentID)
+SELECT
+    'Emp' + RIGHT('000' + CAST(n AS VARCHAR(3)),3),
+    'Apellido' + CAST(n AS VARCHAR(3)),
+    'emp' + CAST(n AS VARCHAR(3)) + '@example.com',
+    DATEADD(day, -(n * 10), CAST(GETDATE() AS DATE)),
+    30000 + (ABS(CHECKSUM(NEWID())) % 70000),
+    CASE WHEN n % 10 = 0 THEN NULL ELSE (n % 8) + 1 END
+FROM tally;
+GO
+
+-- 20 PROYECTOS
+;WITH p AS (
+    SELECT TOP (20) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n
+    FROM sys.all_objects
+)
+INSERT INTO dbo.Projects (ProjectName, StartDate, EndDate, LeaderEmployeeID)
+SELECT
+    'Project ' + RIGHT('00' + CAST(n AS VARCHAR(2)),2),
+    DATEADD(day, - (n * 20), GETDATE()),
+    DATEADD(day, (n * 20), GETDATE()),
+    CASE WHEN n % 4 = 0 THEN NULL
+         ELSE (SELECT TOP 1 EmployeeID FROM dbo.Employees ORDER BY NEWID()) END
+FROM p;
+GO
+
+-- 200 EVALUACIONES RANDOM
+INSERT INTO dbo.Evaluations (EmployeeID, EvalDate, Score, Comments)
+SELECT TOP (200)
+    E.EmployeeID,
+    DATEADD(month, -(ROW_NUMBER() OVER(ORDER BY E.EmployeeID) % 12), GETDATE()),
+    (ABS(CHECKSUM(NEWID())) % 5) + 1,
+    'Evaluacion para empleado ' + CAST(E.EmployeeID AS VARCHAR(10))
+FROM dbo.Employees E
+ORDER BY NEWID();
+GO
+```
+
+### Entregable
+
+Documento en Google Docs que contenga:
+
+1. **Introduccion:** Breve explicacion del proposito del ejercicio.
+2. **Desarrollo del ejercicio:** Las sentencias SQL utilizadas (SELECT, UPDATE, DELETE, transacciones) con una explicacion de cada paso.
+3. **Conclusiones:** Reflexion sobre la importancia de cada patron seguro aplicado y capturas de pantalla de los resultados.
+
+---
+---
+
+# WHERE y operadores: sintaxis y ejemplos
+
+## Introduccion
+
+¿Alguna vez necesitaste buscar algo especifico en una tabla con miles de datos? Por ejemplo: "mostrame solo los empleados que ganan mas de $50.000" o "busca los clientes de Buenos Aires". Para eso existe la clausula **WHERE** en SQL.
+
+`WHERE` es el **filtro** de SQL. Sin el, cada consulta te devuelve **todo** el contenido de la tabla. Con `WHERE`, le decis a la base de datos: "solo quiero las filas que cumplan esta condicion".
+
+---
+
+## La clausula WHERE
+
+### Sintaxis basica
+
+```sql
+SELECT columnas
+FROM tabla
+WHERE condicion;
+```
+
+**Ejemplo simple:**
+
+```sql
+SELECT * FROM empleados WHERE salario > 3000;
+```
+
+Esto devuelve solo los empleados cuyo salario es mayor a 3000. Los demas no aparecen.
+
+---
+
+## Operadores comparativos basicos
+
+Son los simbolos que usas para **comparar valores**. Son iguales a los que usas en matematica:
+
+| Operador | Significado | Ejemplo | ¿Que devuelve? |
+|----------|------------|---------|----------------|
+| `=` | Igual a | `WHERE edad = 30` | Personas con exactamente 30 anos |
+| `<>` o `!=` | Diferente de | `WHERE estado <> 'activo'` | Personas que NO estan activas |
+| `<` | Menor que | `WHERE precio < 100` | Productos mas baratos que $100 |
+| `>` | Mayor que | `WHERE salario > 50000` | Empleados que ganan mas de $50.000 |
+| `<=` | Menor o igual | `WHERE edad <= 18` | Menores de 18 o con exactamente 18 |
+| `>=` | Mayor o igual | `WHERE stock >= 10` | Productos con 10 o mas unidades |
+
+**Ejemplo:**
+
+```sql
+SELECT FirstName, LastName, Salary
+FROM Employees
+WHERE Salary >= 50000;
+```
+
+Esto muestra nombre, apellido y salario de todos los empleados que ganan $50.000 o mas.
+
+---
+
+## Operador BETWEEN (entre dos valores)
+
+`BETWEEN` filtra valores que estan **dentro de un rango**, incluyendo ambos extremos.
+
+**Sintaxis:**
+
+```sql
+WHERE columna BETWEEN valor_minimo AND valor_maximo;
+```
+
+**Ejemplo:**
+
+```sql
+SELECT * FROM Employees
+WHERE Salary BETWEEN 40000 AND 60000;
+```
+
+Esto devuelve empleados que ganan entre $40.000 y $60.000 (incluidos ambos valores).
+
+Es lo mismo que escribir:
+
+```sql
+WHERE Salary >= 40000 AND Salary <= 60000
+```
+
+Pero `BETWEEN` es mas corto y facil de leer.
+
+> **Muy util con fechas:**
+> ```sql
+> SELECT * FROM Ventas
+> WHERE Fecha BETWEEN '2024-01-01' AND '2024-01-31';
+> ```
+> Esto devuelve todas las ventas de enero 2024.
+
+---
+
+## Operador LIKE (buscar patrones en texto)
+
+`LIKE` sirve para buscar **patrones** dentro de textos. Usa dos comodines especiales:
+
+| Comodin | Significado | Ejemplo |
+|---------|------------|---------|
+| `%` | Cualquier cantidad de caracteres (0 o mas) | `'Mar%'` encuentra "Maria", "Marcos", "Mar" |
+| `_` | Exactamente **un** caracter | `'_uan'` encuentra "Juan", "Luan", pero NO "Quan" si tiene mas letras |
+
+### Ejemplos practicos
+
+**Nombres que empiezan con "Mar":**
+
+```sql
+SELECT * FROM Employees WHERE FirstName LIKE 'Mar%';
+```
+
+Encuentra: Maria, Marcos, Martina, Mariano...
+
+**Nombres que terminan con "ez":**
+
+```sql
+SELECT * FROM Employees WHERE LastName LIKE '%ez';
+```
+
+Encuentra: Lopez, Perez, Fernandez, Gomez...
+
+**Nombres que contienen "car" en cualquier parte:**
+
+```sql
+SELECT * FROM Employees WHERE FirstName LIKE '%car%';
+```
+
+Encuentra: Carlos, Oscar, Ricardo...
+
+**Emails de un dominio especifico:**
+
+```sql
+SELECT * FROM Employees WHERE Email LIKE '%@example.com';
+```
+
+Encuentra todos los empleados cuyo email termina en "@example.com".
+
+**Nombres de exactamente 3 letras:**
+
+```sql
+SELECT * FROM Employees WHERE FirstName LIKE '___';
+```
+
+Tres guiones bajos = exactamente 3 caracteres. Encuentra: Ana, Leo, Max...
+
+---
+
+## Operador IN (esta en una lista)
+
+`IN` filtra filas que coinciden con **cualquiera de los valores** de una lista. Es como preguntar: "¿esta en este grupo?"
+
+**Sintaxis:**
+
+```sql
+WHERE columna IN (valor1, valor2, valor3);
+```
+
+**Ejemplo:**
+
+```sql
+SELECT * FROM Departments
+WHERE Location IN ('Buenos Aires', 'CABA', 'Rosario');
+```
+
+Esto devuelve los departamentos ubicados en Buenos Aires, CABA o Rosario.
+
+Es lo mismo que escribir:
+
+```sql
+WHERE Location = 'Buenos Aires'
+   OR Location = 'CABA'
+   OR Location = 'Rosario'
+```
+
+Pero `IN` es mucho mas limpio y facil de leer, especialmente cuando tenes muchos valores.
+
+---
+
+## NULL: El valor que no es un valor
+
+### ¿Que es NULL?
+
+`NULL` es uno de los conceptos mas confusos para principiantes. Significa **"no hay dato"**, **"desconocido"** o **"no se informo"**.
+
+**NULL NO es:**
+- No es cero (`0`)
+- No es texto vacio (`''`)
+- No es la palabra "null"
+
+Es simplemente la **ausencia de valor**. Como una celda vacia en Excel.
+
+### ¿Como filtrar por NULL?
+
+Aca viene lo importante: **NO podes usar `=` ni `<>` para comparar con NULL**. Si lo haces, no funciona como esperas.
+
+```sql
+-- INCORRECTO (no funciona como esperas):
+SELECT * FROM Employees WHERE DepartmentID = NULL;
+
+-- CORRECTO:
+SELECT * FROM Employees WHERE DepartmentID IS NULL;
+```
+
+```sql
+-- INCORRECTO:
+SELECT * FROM Employees WHERE DepartmentID <> NULL;
+
+-- CORRECTO:
+SELECT * FROM Employees WHERE DepartmentID IS NOT NULL;
+```
+
+### ¿Por que no funciona con `=`?
+
+Porque NULL significa "desconocido". Si le preguntas a SQL "¿es NULL igual a NULL?", la respuesta es **"no se"** (ni verdadero ni falso). Por eso siempre usa `IS NULL` o `IS NOT NULL`.
+
+### Ejemplo practico
+
+En nuestra tabla de empleados, algunos no tienen departamento asignado (su DepartmentID es NULL):
+
+```sql
+-- Empleados SIN departamento asignado
+SELECT FirstName, LastName
+FROM Employees
+WHERE DepartmentID IS NULL;
+
+-- Empleados CON departamento asignado
+SELECT FirstName, LastName
+FROM Employees
+WHERE DepartmentID IS NOT NULL;
+```
+
+---
+
+## Combinando operadores con AND y OR
+
+Podes combinar varias condiciones en un solo WHERE:
+
+- **AND** = ambas condiciones deben cumplirse
+- **OR** = al menos una condicion debe cumplirse
+
+**Ejemplo con AND:**
+
+```sql
+SELECT * FROM Employees
+WHERE Salary > 50000
+  AND DepartmentID = 2;
+```
+
+Empleados que ganan mas de $50.000 **Y** pertenecen al departamento 2.
+
+**Ejemplo con OR:**
+
+```sql
+SELECT * FROM Employees
+WHERE DepartmentID = 1
+   OR DepartmentID = 3;
+```
+
+Empleados del departamento 1 **O** del departamento 3.
+
+**Ejemplo combinado (usa parentesis para claridad):**
+
+```sql
+SELECT * FROM Employees
+WHERE (DepartmentID = 1 OR DepartmentID = 2)
+  AND Salary > 40000;
+```
+
+Empleados de los departamentos 1 o 2, pero solo los que ganan mas de $40.000.
+
+> **Tip:** Siempre usa **parentesis** cuando combines AND y OR, para que quede claro el orden de evaluacion. Sin parentesis, AND se evalua antes que OR y podes obtener resultados inesperados.
+
+---
+
+## Resumen de operadores
+
+| Operador | Uso | Ejemplo |
+|----------|-----|---------|
+| `=` | Igualdad | `WHERE edad = 30` |
+| `<>` o `!=` | Diferente | `WHERE estado != 'activo'` |
+| `>`, `<`, `>=`, `<=` | Comparacion | `WHERE salario > 50000` |
+| `BETWEEN` | Rango inclusivo | `WHERE fecha BETWEEN '2024-01-01' AND '2024-01-31'` |
+| `LIKE` | Patron de texto | `WHERE nombre LIKE 'J%'` |
+| `IN` | Inclusion en lista | `WHERE categoria IN ('A', 'B', 'C')` |
+| `IS NULL` | Valor nulo | `WHERE fecha IS NULL` |
+| `IS NOT NULL` | Valor no nulo | `WHERE fecha IS NOT NULL` |
+| `AND` | Ambas condiciones | `WHERE edad > 18 AND activo = 1` |
+| `OR` | Al menos una condicion | `WHERE ciudad = 'CABA' OR ciudad = 'Rosario'` |
+
+> **Tip final:** Filtrar datos correctamente es una de las habilidades mas importantes en SQL. Un filtro mal escrito puede devolverte datos incorrectos o incompletos, y eso puede llevar a decisiones equivocadas. Siempre verifica tus resultados.
