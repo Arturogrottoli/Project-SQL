@@ -187,3 +187,96 @@ SELECT
 FROM canciones
 WHERE precio IS NOT NULL
 ORDER BY reproducciones DESC;
+
+
+-- ============================================================
+-- PASO 6: VISTAS (CREATE VIEW)
+-- ============================================================
+-- Una vista es una consulta guardada con nombre.
+-- No almacena datos: cada vez que la consultamos, ejecuta
+-- la query original sobre los datos actuales de las tablas.
+--
+-- Ventajas:
+--   - Simplifica consultas complejas
+--   - Reutilizamos logica sin repetir codigo
+--   - Podemos darle acceso a una vista sin exponer la tabla completa
+-- ============================================================
+
+
+-- ---- Vista 1: filtro simple sobre una tabla ----
+-- Muestra solo los artistas de Argentina
+
+CREATE VIEW vista_bandas_argentinas AS
+    SELECT nombre, genero, anio_debut
+    FROM artistas
+    WHERE pais = 'Argentina';
+
+-- Consultar la vista igual que si fuera una tabla
+SELECT * FROM vista_bandas_argentinas;
+
+
+-- ---- Vista 2: columna calculada ----
+-- Muestra las canciones con duracion en formato legible y reproducciones en millones
+
+CREATE VIEW vista_canciones_detalle AS
+    SELECT
+        id_cancion,
+        id_artista,
+        titulo,
+        CONCAT(duracion_seg DIV 60, 'm ', duracion_seg MOD 60, 's') AS duracion,
+        ROUND(reproducciones / 1000000, 1) AS reprod_millones,
+        precio
+    FROM canciones;
+
+SELECT * FROM vista_canciones_detalle;
+
+-- Las vistas se pueden filtrar igual que una tabla
+SELECT * FROM vista_canciones_detalle WHERE reprod_millones > 500;
+
+
+-- ---- Vista 3: varias tablas (JOIN) ----
+-- Combina informacion de canciones y artistas en una sola vista
+-- JOIN une dos tablas por una columna en comun (en este caso, id_artista)
+
+CREATE VIEW vista_catalogo AS
+    SELECT
+        c.titulo,
+        a.nombre                                                     AS artista,
+        a.genero,
+        CONCAT(c.duracion_seg DIV 60, 'm ', c.duracion_seg MOD 60, 's') AS duracion,
+        ROUND(c.reproducciones / 1000000, 1)                         AS reprod_millones,
+        c.precio
+    FROM canciones c
+    JOIN artistas a ON c.id_artista = a.id_artista;
+
+SELECT * FROM vista_catalogo;
+
+-- La vista ya tiene el nombre del artista, no el id
+-- Podemos filtrar directamente por nombre o genero
+SELECT * FROM vista_catalogo WHERE artista = 'Metallica';
+SELECT * FROM vista_catalogo WHERE genero = 'Rock Nacional' ORDER BY reprod_millones DESC;
+
+
+-- ---- Modificar una vista: CREATE OR REPLACE VIEW ----
+-- Reemplaza la vista existente sin necesidad de borrarla primero.
+-- Util cuando queremos agregar o cambiar columnas.
+
+CREATE OR REPLACE VIEW vista_bandas_argentinas AS
+    SELECT nombre, pais, genero, anio_debut
+    FROM artistas
+    WHERE pais = 'Argentina';
+
+-- Ahora la vista incluye la columna "pais"
+SELECT * FROM vista_bandas_argentinas;
+
+
+-- ---- Ver las vistas existentes en la base de datos ----
+SHOW FULL TABLES WHERE Table_type = 'VIEW';
+
+
+-- ---- Eliminar una vista: DROP VIEW ----
+-- Borra la vista pero NO afecta las tablas ni los datos originales
+
+DROP VIEW IF EXISTS vista_bandas_argentinas;
+DROP VIEW IF EXISTS vista_canciones_detalle;
+DROP VIEW IF EXISTS vista_catalogo;
