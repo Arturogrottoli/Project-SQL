@@ -1,411 +1,189 @@
 -- ============================================================
--- BASE DE DATOS NBA
--- ============================================================
--- Este script crea una base de datos para gestionar informacion
--- de la NBA: equipos, estadios, jugadores, temporadas,
--- partidos, records y estadisticas individuales.
---
+-- CLASE 04: REPASO + VISTAS
 -- Motor: MySQL
--- Sentencias utilizadas:
---   DDL -> CREATE (crear), ALTER (modificar), DROP (eliminar)
---   DML -> INSERT (insertar datos), SELECT (consultar datos)
 -- ============================================================
 
 
 -- ============================================================
 -- PASO 1: CREAR LA BASE DE DATOS
 -- ============================================================
--- Primero eliminamos la base si ya existe para empezar de cero.
--- Luego la creamos y la seleccionamos con USE para trabajar dentro de ella.
 
-DROP DATABASE IF EXISTS nba;
-CREATE DATABASE nba;
-USE nba;
+DROP DATABASE IF EXISTS musica;
+CREATE DATABASE musica;
+USE musica;
 
 
 -- ============================================================
--- PASO 2: CREAR LAS TABLAS (DDL - CREATE TABLE)
--- ============================================================
--- Creamos las tablas en orden logico: primero las que NO dependen
--- de otras (estadios), luego las que SI dependen (equipos, jugadores, etc.)
--- Esto es importante porque las FOREIGN KEYS necesitan que la tabla
--- referenciada ya exista.
+-- PASO 2: CREAR LAS TABLAS
 -- ============================================================
 
-
--- ------------------------------------------------------------
--- TABLA: estadios
--- Almacena la informacion de cada estadio de la NBA.
--- Se crea PRIMERO porque la tabla "equipos" la va a referenciar.
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS estadios;
-CREATE TABLE estadios (
-    ID_Estadio INT AUTO_INCREMENT PRIMARY KEY,  -- Clave primaria, se autoincrementa
-    Ciudad     VARCHAR(50) DEFAULT NULL,         -- Ciudad donde esta el estadio
-    Nombre     VARCHAR(50) DEFAULT NULL,         -- Nombre del estadio
-    Capacidad  INT NOT NULL                      -- Capacidad de espectadores
+CREATE TABLE artistas (
+    id_artista  INT AUTO_INCREMENT PRIMARY KEY,
+    nombre      VARCHAR(100) NOT NULL,
+    pais        VARCHAR(50),
+    genero      VARCHAR(50),
+    anio_debut  INT
 );
 
-
--- ------------------------------------------------------------
--- TABLA: equipos
--- Almacena los equipos de la NBA con su estadio, ciudad y titulos.
--- Tiene una FK que apunta a la tabla estadios.
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS equipos;
-CREATE TABLE equipos (
-    ID_Equipo   INT AUTO_INCREMENT PRIMARY KEY,   -- Clave primaria
-    ID_Estadio  INT NOT NULL,                     -- FK -> estadios(ID_Estadio)
-    Nombre      VARCHAR(50) DEFAULT NULL,         -- Nombre del equipo
-    Ciudad      VARCHAR(50) DEFAULT NULL,         -- Ciudad del equipo
-    Titulos     INT DEFAULT NULL,                 -- Cantidad de campeonatos ganados
-    Conferencia VARCHAR(20) DEFAULT NULL,         -- Conferencia: 'Este' u 'Oeste'
-    FOREIGN KEY (ID_Estadio) REFERENCES estadios(ID_Estadio)
-);
-
-
--- ------------------------------------------------------------
--- TABLA: jugadores
--- Almacena los jugadores con su equipo, datos personales y posicion.
--- Tiene una FK que apunta a la tabla equipos.
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS jugadores;
-CREATE TABLE jugadores (
-    ID_Jugador      INT NOT NULL PRIMARY KEY,     -- Clave primaria (manual, no autoincrement)
-    ID_Equipo       INT NOT NULL,                 -- FK -> equipos(ID_Equipo)
-    Nombre          VARCHAR(50),                  -- Nombre completo del jugador
-    FechaNacimiento DATE,                         -- Fecha de nacimiento
-    Nacionalidad    VARCHAR(50),                  -- Pais de origen
-    Posicion        VARCHAR(20),                  -- Posicion en cancha (Base, Escolta, Alero, Ala Pivot, Pivot)
-    FOREIGN KEY (ID_Equipo) REFERENCES equipos(ID_Equipo)
-);
-
-
--- ------------------------------------------------------------
--- TABLA: temporada
--- Registra las temporadas en las que participo cada equipo.
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS temporada;
-CREATE TABLE temporada (
-    ID_Temporada INT AUTO_INCREMENT PRIMARY KEY,  -- Clave primaria
-    ID_Equipo    INT NOT NULL,                    -- FK -> equipos(ID_Equipo)
-    Season       VARCHAR(50),                     -- Ano de la temporada (ej: '1947')
-    FOREIGN KEY (ID_Equipo) REFERENCES equipos(ID_Equipo)
-);
-
-
--- ------------------------------------------------------------
--- TABLA: partidos
--- Registra los resultados de partidos entre equipos en cada temporada.
--- Tiene 3 FK: una a temporada y dos a equipos (local y visitante).
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS partidos;
-CREATE TABLE partidos (
-    ID_Partido          INT AUTO_INCREMENT PRIMARY KEY,
-    ID_Temporada        INT NOT NULL,             -- FK -> temporada(ID_Temporada)
-    ID_Equipo_Local     INT NOT NULL,             -- FK -> equipos(ID_Equipo) del equipo local
-    ID_Equipo_Visitante INT NOT NULL,             -- FK -> equipos(ID_Equipo) del equipo visitante
-    Resultado           VARCHAR(20),              -- Resultado del partido (ej: '120-80')
-    FOREIGN KEY (ID_Temporada) REFERENCES temporada(ID_Temporada),
-    FOREIGN KEY (ID_Equipo_Local) REFERENCES equipos(ID_Equipo),
-    FOREIGN KEY (ID_Equipo_Visitante) REFERENCES equipos(ID_Equipo)
-);
-
-
--- ------------------------------------------------------------
--- TABLA: record
--- Almacena el record de cada equipo en una temporada:
--- partidos ganados, perdidos, porcentaje de victorias y posicion.
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS record;
-CREATE TABLE record (
-    ID_Record       INT AUTO_INCREMENT PRIMARY KEY,
-    ID_Equipo       INT NOT NULL,                 -- FK -> equipos(ID_Equipo)
-    ID_Temporada    INT NOT NULL,                 -- FK -> temporada(ID_Temporada)
-    PartidosGanados  INT,                         -- Cantidad de partidos ganados
-    PartidosPerdidos INT,                         -- Cantidad de partidos perdidos
-    Ratio           FLOAT,                        -- Porcentaje de victorias (ej: 54.87%)
-    Posicion        INT NOT NULL,                 -- Posicion en la tabla de la conferencia
-    FOREIGN KEY (ID_Equipo) REFERENCES equipos(ID_Equipo),
-    FOREIGN KEY (ID_Temporada) REFERENCES temporada(ID_Temporada)
-);
-
-
--- ------------------------------------------------------------
--- TABLA: puntos
--- Registra los puntos totales y promedio de un jugador en una temporada.
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS puntos;
-CREATE TABLE puntos (
-    ID_Puntos    INT PRIMARY KEY,
-    ID_Jugador   INT NOT NULL,                    -- FK -> jugadores(ID_Jugador)
-    ID_Temporada INT NOT NULL,                    -- FK -> temporada(ID_Temporada)
-    Cantidad     INT,                             -- Puntos totales en la temporada
-    Promedio     FLOAT,                           -- Promedio de puntos por partido
-    FOREIGN KEY (ID_Jugador) REFERENCES jugadores(ID_Jugador),
-    FOREIGN KEY (ID_Temporada) REFERENCES temporada(ID_Temporada)
-);
-
-
--- ------------------------------------------------------------
--- TABLA: rebotes
--- Registra los rebotes totales y promedio de un jugador en una temporada.
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS rebotes;
-CREATE TABLE rebotes (
-    ID_Rebotes   INT PRIMARY KEY,
-    ID_Jugador   INT NOT NULL,                    -- FK -> jugadores(ID_Jugador)
-    ID_Temporada INT NOT NULL,                    -- FK -> temporada(ID_Temporada)
-    Cantidad     INT,                             -- Rebotes totales en la temporada
-    Promedio     FLOAT,                           -- Promedio de rebotes por partido
-    FOREIGN KEY (ID_Jugador) REFERENCES jugadores(ID_Jugador),
-    FOREIGN KEY (ID_Temporada) REFERENCES temporada(ID_Temporada)
-);
-
-
--- ------------------------------------------------------------
--- TABLA: asistencias
--- Registra las asistencias totales y promedio de un jugador en una temporada.
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS asistencias;
-CREATE TABLE asistencias (
-    ID_Asistencias INT PRIMARY KEY,
-    ID_Jugador     INT NOT NULL,                  -- FK -> jugadores(ID_Jugador)
-    ID_Temporada   INT NOT NULL,                  -- FK -> temporada(ID_Temporada)
-    Cantidad       INT,                           -- Asistencias totales en la temporada
-    Promedio       FLOAT,                         -- Promedio de asistencias por partido
-    FOREIGN KEY (ID_Jugador) REFERENCES jugadores(ID_Jugador),
-    FOREIGN KEY (ID_Temporada) REFERENCES temporada(ID_Temporada)
-);
-
-
--- ------------------------------------------------------------
--- TABLA: estadisticas
--- Tabla resumen que vincula a un jugador en una temporada con
--- sus puntos, rebotes y asistencias. Funciona como una tabla
--- de relacion (o tabla puente) que conecta todas las stats.
--- ------------------------------------------------------------
-
-DROP TABLE IF EXISTS estadisticas;
-CREATE TABLE estadisticas (
-    ID_Estadisticas INT PRIMARY KEY,
-    ID_Jugador      INT NOT NULL,                 -- FK -> jugadores(ID_Jugador)
-    ID_Temporada    INT NOT NULL,                 -- FK -> temporada(ID_Temporada)
-    ID_Puntos       INT NOT NULL,                 -- FK -> puntos(ID_Puntos)
-    ID_Rebotes      INT NOT NULL,                 -- FK -> rebotes(ID_Rebotes)
-    ID_Asistencias  INT NOT NULL,                 -- FK -> asistencias(ID_Asistencias)
-    FOREIGN KEY (ID_Jugador) REFERENCES jugadores(ID_Jugador),
-    FOREIGN KEY (ID_Temporada) REFERENCES temporada(ID_Temporada),
-    FOREIGN KEY (ID_Puntos) REFERENCES puntos(ID_Puntos),
-    FOREIGN KEY (ID_Rebotes) REFERENCES rebotes(ID_Rebotes),
-    FOREIGN KEY (ID_Asistencias) REFERENCES asistencias(ID_Asistencias)
+CREATE TABLE canciones (
+    id_cancion      INT AUTO_INCREMENT PRIMARY KEY,
+    id_artista      INT NOT NULL,
+    titulo          VARCHAR(150) NOT NULL,
+    duracion_seg    INT,           -- duracion en segundos
+    reproducciones  BIGINT,        -- total de reproducciones
+    precio          DECIMAL(5,2),  -- precio en USD (NULL = gratuita / sin precio)
+    FOREIGN KEY (id_artista) REFERENCES artistas(id_artista)
 );
 
 
 -- ============================================================
--- PASO 3: INSERTAR DATOS (DML - INSERT INTO)
--- ============================================================
--- Insertamos los datos en el mismo orden que creamos las tablas:
--- primero estadios, luego equipos, jugadores, etc.
--- Esto respeta las FOREIGN KEYS (no puedo insertar un equipo
--- que referencia un estadio que todavia no existe).
+-- PASO 3: INSERTAR DATOS
 -- ============================================================
 
-
--- ------------------------------------------------------------
--- DATOS: estadios (7 estadios de la conferencia Este)
--- ------------------------------------------------------------
-
-INSERT INTO estadios (ID_Estadio, Ciudad, Nombre, Capacidad)
+-- Forma 1: especificando las columnas (recomendada, mas segura)
+INSERT INTO artistas (nombre, pais, genero, anio_debut)
 VALUES
-    (1, 'Atlanta',   'State Farm Arena',              16600),
-    (2, 'Boston',    'TD Garden',                     18624),
-    (3, 'Brooklyn',  'Barclays Center',               17732),
-    (4, 'Charlotte', 'Spectrum Center',               19077),
-    (5, 'Chicago',   'United Center',                 23500),
-    (6, 'Cleveland', 'Rocket Mortgage FieldHouse',    19432),
-    (7, 'Detroit',   'Little Caesars Arena',           20332);
+    ('Nirvana',                   'Estados Unidos', 'Grunge',        1987),
+    ('Metallica',                 'Estados Unidos', 'Heavy Metal',   1981),
+    ('Arctic Monkeys',            'Reino Unido',    'Rock',          2002),
+    ('Los Redonditos de Ricota',  'Argentina',      'Rock Nacional', 1976),
+    ('La Renga',                  'Argentina',      'Rock Nacional', 1989);
 
-
--- ------------------------------------------------------------
--- DATOS: equipos (7 equipos de la conferencia Este)
--- Cada equipo se asocia a su estadio mediante ID_Estadio (FK)
--- ------------------------------------------------------------
-
-INSERT INTO equipos (ID_Equipo, ID_Estadio, Nombre, Ciudad, Titulos, Conferencia)
+-- Forma 2: sin especificar columnas (el orden debe coincidir con la tabla)
+-- Util para inserciones rapidas cuando conocemos bien la estructura
+INSERT INTO canciones
 VALUES
-    (1, 1, 'Atlanta Hawks',        'Atlanta',    1,  'Este'),
-    (2, 2, 'Boston Celtics',       'Boston',     17, 'Este'),
-    (3, 3, 'Brooklyn Nets',        'Brooklyn',   2,  'Este'),
-    (4, 4, 'Charlotte Hornets',    'Charlotte',  0,  'Este'),
-    (5, 5, 'Chicago Bulls',        'Chicago',    6,  'Este'),
-    (6, 6, 'Cleveland Cavaliers',  'Cleveland',  1,  'Este'),
-    (7, 7, 'Detroit Pistons',      'Detroit',    3,  'Este');
+    -- Nirvana (id_artista = 1)
+    (1,  1, 'Smells Like Teen Spirit', 5*60+1,  1800000000, 1.29),
+    (2,  1, 'Come as You Are',         3*60+38, 1200000000, 1.29),
+    (3,  1, 'Lithium',                 4*60+17, 980000000,  1.29),
+    (4,  1, 'Heart-Shaped Box',        4*60+41, 760000000,  1.29),
 
+    -- Metallica (id_artista = 2)
+    (5,  2, 'Enter Sandman',           5*60+31, 1500000000, 1.29),
+    (6,  2, 'Master of Puppets',       8*60+35, 1100000000, 1.29),
+    (7,  2, 'Nothing Else Matters',    6*60+28, 1900000000, 1.29),
+    (8,  2, 'One',                     7*60+25, 880000000,  1.29),
 
--- ------------------------------------------------------------
--- DATOS: jugadores (18 jugadores repartidos en 4 equipos)
--- Cada jugador se asocia a su equipo mediante ID_Equipo (FK)
---
--- Posiciones en basquet:
---   Base (PG)       = El que dirige el juego y distribuye el balon
---   Escolta (SG)    = Tirador principal desde el perimetro
---   Alero (SF)      = Jugador versatil, ataque y defensa
---   Ala Pivot (PF)  = Juega cerca del aro, pero tambien puede tirar
---   Pivot (C)       = El mas alto, juega debajo del aro
--- ------------------------------------------------------------
+    -- Arctic Monkeys (id_artista = 3)
+    (9,  3, 'Do I Wanna Know?',        4*60+32, 1500000000, 1.29),
+    (10, 3, 'R U Mine?',               3*60+21, 980000000,  1.29),
+    (11, 3, '505',                     4*60+13, 1100000000, 1.29),
+    (12, 3, 'Fluorescent Adolescent',  2*60+57, 720000000,  1.29),
 
-INSERT INTO jugadores (ID_Jugador, ID_Equipo, Nombre, FechaNacimiento, Nacionalidad, Posicion)
-VALUES
-    -- Atlanta Hawks (ID_Equipo = 1)
-    (1,  1, 'Bogdan Bogdanovic', '1992-08-18', 'Serbio',          'Escolta'),
-    (2,  1, 'Clint Capela',      '1994-05-18', 'Suizo',           'Pivot'),
-    (3,  1, 'John Collins',      '1997-09-23', 'Estadounidense',  'Ala Pivot'),
-    (4,  1, 'Sharife Cooper',    '2001-06-11', 'Estadounidense',  'Base'),
-    (5,  1, 'Gorgui Dieng',     '1990-01-18', 'Senegales',       'Pivot'),
+    -- Los Redonditos de Ricota (id_artista = 4)
+    (13, 4, 'La Bestia Pop',           4*60+18, 45000000,   NULL),
+    (14, 4, 'Jijiji',                  3*60+52, 38000000,   NULL),
+    (15, 4, 'Motor Psico',             4*60+5,  29000000,   NULL),
+    (16, 4, 'Maldicion Poco Elegante', 3*60+40, 21000000,   NULL),
 
-    -- Boston Celtics (ID_Equipo = 2)
-    (6,  2, 'Bol Bol',          '1999-11-16', 'Estadounidense',  'Pivot'),
-    (7,  2, 'Jaylen Brown',     '1996-10-24', 'Estadounidense',  'Escolta'),
-    (8,  2, 'P.J. Dozier',      '1996-10-25', 'Estadounidense',  'Base'),
-
-    -- Brooklyn Nets (ID_Equipo = 3)
-    (9,  3, 'LaMarcus Aldridge', '1985-07-19', 'Estadounidense',  'Ala Pivot'),
-    (10, 3, 'DeAndre Bembry',    '1994-07-04', 'Estadounidense',  'Alero'),
-    (11, 3, 'Bruce Brown',       '1996-07-15', 'Estadounidense',  'Ala Pivot'),
-    (12, 3, 'Jevon Carter',      '1995-09-14', 'Estadounidense',  'Base'),
-
-    -- Charlotte Hornets (ID_Equipo = 4)
-    (13, 4, 'LaMelo Ball',       '2001-08-22', 'Estadounidense',  'Base'),
-    (14, 4, 'James Bouknight',   '2000-09-18', 'Estadounidense',  'Escolta'),
-    (15, 4, 'Miles Bridges',     '1998-03-21', 'Estadounidense',  'Alero'),
-    (16, 4, 'Montrezl Harrell',  '1994-01-26', 'Estadounidense',  'Ala Pivot'),
-    (17, 4, 'Gordon Hayward',    '1990-03-23', 'Estadounidense',  'Alero'),
-    (18, 4, 'Kai Jones',         '2001-01-19', 'Bahameno',        'Pivot');
-
-
--- ------------------------------------------------------------
--- DATOS: temporada
--- Registra en que temporadas participaron algunos equipos.
--- Season indica el ano de inicio de la temporada.
--- ------------------------------------------------------------
-
-INSERT INTO temporada (ID_Temporada, ID_Equipo, Season)
-VALUES
-    (1, 3, '1947'),    -- Brooklyn Nets, temporada 1947
-    (2, 2, '1948'),    -- Boston Celtics, temporada 1948
-    (3, 2, '1949'),    -- Boston Celtics, temporada 1949
-    (4, 1, '1950');    -- Atlanta Hawks, temporada 1950
-
-
--- ------------------------------------------------------------
--- DATOS: partidos
--- Resultados de partidos entre equipos en cada temporada.
--- Formato del resultado: 'puntos_local-puntos_visitante'
--- ------------------------------------------------------------
-
-INSERT INTO partidos (ID_Partido, ID_Temporada, ID_Equipo_Local, ID_Equipo_Visitante, Resultado)
-VALUES
-    (1, 1, 1, 2, '120-80'),   -- Temporada 1947: Hawks (local) vs Celtics (visitante)
-    (2, 2, 3, 4, '110-89'),   -- Temporada 1948: Nets (local) vs Hornets (visitante)
-    (3, 3, 1, 3, '90-95'),    -- Temporada 1949: Hawks (local) vs Nets (visitante)
-    (4, 4, 2, 4, '99-82');    -- Temporada 1950: Celtics (local) vs Hornets (visitante)
-
-
--- ------------------------------------------------------------
--- DATOS: record
--- Record de cada equipo en una temporada:
--- - PartidosGanados / PartidosPerdidos
--- - Ratio = porcentaje de victorias (ganados / total * 100)
--- - Posicion = lugar en la tabla de la conferencia
--- ------------------------------------------------------------
-
-INSERT INTO record (ID_Record, ID_Equipo, ID_Temporada, PartidosGanados, PartidosPerdidos, Ratio, Posicion)
-VALUES
-    (1, 1, 1, 45, 37, 54.87, 6),    -- Hawks en temporada 1947: 45-37, 6to lugar
-    (2, 2, 4, 50, 32, 60.97, 3),    -- Celtics en temporada 1950: 50-32, 3er lugar
-    (3, 1, 2, 30, 52, 36.58, 10),   -- Hawks en temporada 1948: 30-52, 10mo lugar
-    (4, 4, 3, 40, 42, 48.78, 8);    -- Hornets en temporada 1949: 40-42, 8vo lugar
-
-
--- ------------------------------------------------------------
--- DATOS: puntos
--- Puntos totales y promedio por partido de cada jugador en una temporada.
--- ------------------------------------------------------------
-
-INSERT INTO puntos (ID_Puntos, ID_Jugador, ID_Temporada, Cantidad, Promedio)
-VALUES
-    (1, 1, 1, 820,  10.00),   -- Bogdanovic en temp. 1947: 820 puntos, 10.00 PPG
-    (2, 2, 4, 1437, 17.52),   -- Capela en temp. 1950: 1437 puntos, 17.52 PPG
-    (3, 3, 2, 752,  9.17),    -- Collins en temp. 1948: 752 puntos, 9.17 PPG
-    (4, 4, 3, 452,  5.51);    -- Cooper en temp. 1949: 452 puntos, 5.51 PPG
-
-
--- ------------------------------------------------------------
--- DATOS: rebotes
--- Rebotes totales y promedio por partido de cada jugador en una temporada.
--- ------------------------------------------------------------
-
-INSERT INTO rebotes (ID_Rebotes, ID_Jugador, ID_Temporada, Cantidad, Promedio)
-VALUES
-    (1, 1, 1, 620,  7.56),    -- Bogdanovic en temp. 1947: 620 rebotes, 7.56 RPG
-    (2, 2, 4, 1022, 12.46),   -- Capela en temp. 1950: 1022 rebotes, 12.46 RPG
-    (3, 3, 2, 256,  3.12),    -- Collins en temp. 1948: 256 rebotes, 3.12 RPG
-    (4, 4, 3, 427,  5.20);    -- Cooper en temp. 1949: 427 rebotes, 5.20 RPG
-
-
--- ------------------------------------------------------------
--- DATOS: asistencias
--- Asistencias totales y promedio por partido de cada jugador en una temporada.
--- ------------------------------------------------------------
-
-INSERT INTO asistencias (ID_Asistencias, ID_Jugador, ID_Temporada, Cantidad, Promedio)
-VALUES
-    (1, 1, 1, 510, 6.21),     -- Bogdanovic en temp. 1947: 510 asistencias, 6.21 APG
-    (2, 2, 4, 856, 10.43),    -- Capela en temp. 1950: 856 asistencias, 10.43 APG
-    (3, 3, 2, 420, 5.12),     -- Collins en temp. 1948: 420 asistencias, 5.12 APG
-    (4, 4, 3, 512, 6.24);     -- Cooper en temp. 1949: 512 asistencias, 6.24 APG
-
-
--- ------------------------------------------------------------
--- DATOS: estadisticas
--- Tabla resumen que vincula jugador + temporada + puntos + rebotes + asistencias.
--- Cada fila conecta los IDs de las otras tablas para tener
--- todas las estadisticas de un jugador en un solo lugar.
--- ------------------------------------------------------------
-
-INSERT INTO estadisticas (ID_Estadisticas, ID_Jugador, ID_Temporada, ID_Puntos, ID_Rebotes, ID_Asistencias)
-VALUES
-    (1, 1, 1, 1, 1, 1),   -- Bogdanovic, temp. 1947: stats completas
-    (2, 2, 2, 2, 2, 2),   -- Capela, temp. 1948: stats completas
-    (3, 3, 3, 3, 3, 3),   -- Collins, temp. 1949: stats completas
-    (4, 4, 4, 4, 4, 4);   -- Cooper, temp. 1950: stats completas
+    -- La Renga (id_artista = 5)
+    (17, 5, 'Panic Show',                    4*60+22, 18000000, NULL),
+    (18, 5, 'La Balada del Diablo y la Muerte', 5*60+8,  24000000, NULL),
+    (19, 5, 'Me Muero de Amor',              3*60+55, 14000000, NULL),
+    (20, 5, 'Todo a Pulmon',                 4*60+10, 11000000, NULL);
 
 
 -- ============================================================
--- CONSULTAS DE VERIFICACION (DML - SELECT)
--- ============================================================
--- Estas consultas sirven para verificar que los datos se
--- insertaron correctamente. Usa SELECT * para ver todo el
--- contenido de cada tabla.
+-- PASO 4: VER EL CONTENIDO
 -- ============================================================
 
-SELECT * FROM estadios;
-SELECT * FROM equipos;
-SELECT * FROM jugadores;
-SELECT * FROM temporada;
-SELECT * FROM partidos;
-SELECT * FROM record;
-SELECT * FROM puntos;
-SELECT * FROM rebotes;
-SELECT * FROM asistencias;
-SELECT * FROM estadisticas;
+SELECT * FROM artistas;
+SELECT * FROM canciones;
+
+
+-- ============================================================
+-- PASO 5: FILTROS (repaso)
+-- ============================================================
+
+-- ---- ORDER BY ----
+
+-- Canciones ordenadas de mas a menos reproducidas
+SELECT titulo, reproducciones
+FROM canciones
+ORDER BY reproducciones DESC;
+
+-- Artistas ordenados por año de debut
+SELECT nombre, anio_debut
+FROM artistas
+ORDER BY anio_debut ASC;
+
+
+-- ---- WHERE ----
+
+-- Artistas que debutaron antes de 1990
+SELECT nombre, anio_debut
+FROM artistas
+WHERE anio_debut < 1990;
+
+-- Canciones de mas de 6 minutos (360 segundos)
+SELECT titulo, duracion_seg
+FROM canciones
+WHERE duracion_seg > 360;
+
+
+-- ---- BETWEEN ----
+
+-- Artistas que debutaron entre 1980 y 2000
+SELECT nombre, anio_debut
+FROM artistas
+WHERE anio_debut BETWEEN 1980 AND 2000;
+
+-- Canciones entre 3 y 4 minutos (180 a 240 segundos)
+SELECT titulo, duracion_seg
+FROM canciones
+WHERE duracion_seg BETWEEN 180 AND 240;
+
+
+-- ---- IN ----
+
+-- Bandas argentinas o britanicas
+SELECT nombre, pais
+FROM artistas
+WHERE pais IN ('Argentina', 'Reino Unido');
+
+-- Canciones de Metallica y Arctic Monkeys (id 2 y 3)
+SELECT titulo, id_artista
+FROM canciones
+WHERE id_artista IN (2, 3);
+
+
+-- ---- LIKE ----
+
+-- Canciones que empiecen con la letra 'M'
+SELECT titulo FROM canciones WHERE titulo LIKE 'M%';
+
+-- Canciones que contengan la palabra 'the' en cualquier posicion
+SELECT titulo FROM canciones WHERE titulo LIKE '%the%';
+
+
+-- ---- IS NULL / IS NOT NULL ----
+
+-- Canciones sin precio (bandas argentinas, no tienen precio en plataformas pagas)
+SELECT titulo FROM canciones WHERE precio IS NULL;
+
+-- Canciones con precio definido
+SELECT titulo, precio FROM canciones WHERE precio IS NOT NULL;
+
+
+-- ---- DISTINCT ----
+
+-- Generos distintos
+SELECT DISTINCT genero FROM artistas ORDER BY genero;
+
+-- Paises distintos
+SELECT DISTINCT pais FROM artistas ORDER BY pais;
+
+
+-- ---- Columnas calculadas ----
+
+-- Duracion en formato legible y reproducciones en millones
+SELECT
+    titulo,
+    CONCAT(duracion_seg DIV 60, 'm ', duracion_seg MOD 60, 's') AS duracion,
+    ROUND(reproducciones / 1000000, 1)                          AS reprod_millones,
+    precio,
+    ROUND(precio * 1.21, 2)                                     AS precio_con_iva
+FROM canciones
+WHERE precio IS NOT NULL
+ORDER BY reproducciones DESC;
