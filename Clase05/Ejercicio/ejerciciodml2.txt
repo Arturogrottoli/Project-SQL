@@ -1,0 +1,25 @@
+CREATE TABLE detalle_pedido2 (
+    id_detalle INT PRIMARY KEY,
+    id_pedido INT,
+    producto VARCHAR(100),
+    cantidad INT,
+    FOREIGN KEY (id_pedido)
+        REFERENCES pedidos(id_pedido)
+);
+
+INSERT INTO detalle_pedido2 VALUES
+(1,101,'Mouse',2),
+(2,101,'Teclado',1),
+(3,102,'Monitor',1),
+(4,103,'Notebook',1),
+(5,103,'Mouse',1),
+(6,101,'Pad Mouse',3),
+(7,102,'Auriculares',2),
+(8,102,'Webcam',1),
+(9,103,'Disco SSD 1TB',1),
+(10,103,'Memoria RAM 16GB',2),
+(11,101,'Cable HDMI',4),
+(12,101,'Hub USB',1),
+(13,102,'Silla Gamer',1),
+(14,103,'Microfono',1),
+(15,102,'Parlantes',2);
